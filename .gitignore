@@ -1,0 +1,6 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+milk_model.joblib
+.env
