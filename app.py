@@ -31,11 +31,35 @@ def index():
 @app.post("/predict")
 def predict():
     if model_bundle is None:
-        return render_template("index.html", model_ready=False,
-                               model_error=model_error, result=None,
-                               form=request.form), 503
+        return render_template(
+            "index.html",
+            model_ready=False,
+            model_error=model_error,
+            result=None,
+            form=request.form,
+        ), 503
+
+    form = request.form
+
     try:
-        form = request.form
+        required_fields = [
+            "pH", "Temprature", "Taste", "Odor",
+            "Fat", "Turbidity", "Colour",
+            "storage_temp", "elapsed_hrs",
+            "milk_type", "consumer_group",
+        ]
+
+        missing_fields = [
+            field for field in required_fields
+            if not form.get(field, "").strip()
+        ]
+
+        if missing_fields:
+            raise ValueError(
+                "Please complete these fields: "
+                + ", ".join(missing_fields)
+            )
+
         raw = {
             "pH": float(form["pH"]),
             "Temprature": float(form["Temprature"]),
@@ -45,31 +69,55 @@ def predict():
             "Turbidity": int(form["Turbidity"]),
             "Colour": float(form["Colour"]),
         }
+
         storage_temp = float(form["storage_temp"])
         elapsed = float(form["elapsed_hrs"])
         milk_type = form["milk_type"]
         consumer_group = form["consumer_group"]
 
-        if not (0 <= raw["pH"] <= 14):
+        # Validate numeric ranges.
+        if not 0 <= raw["pH"] <= 14:
             raise ValueError("pH must be between 0 and 14.")
-        if not (-5 <= raw["Temprature"] <= 100 and -5 <= storage_temp <= 100):
-            raise ValueError("Temperature values must be between -5°C and 100°C.")
-        if not (0 <= raw["Colour"] <= 255):
+
+        if not -5 <= raw["Temprature"] <= 100:
+            raise ValueError(
+                "Sample temperature must be between -5°C and 100°C."
+            )
+
+        if not -5 <= storage_temp <= 100:
+            raise ValueError(
+                "Storage temperature must be between -5°C and 100°C."
+            )
+
+        if not 0 <= raw["Colour"] <= 255:
             raise ValueError("Colour must be between 0 and 255.")
+
         if elapsed < 0:
             raise ValueError("Elapsed storage time cannot be negative.")
+
+        for field in ("Taste", "Odor", "Fat", "Turbidity"):
+            if raw[field] not in (0, 1):
+                raise ValueError(
+                    f"{field} must be either 0 or 1."
+                )
 
         feature_names = model_bundle["feature_names"]
         scaler = model_bundle["scaler"]
         model = model_bundle["model"]
+
         x = engineer_features(raw, feature_names)
         x_scaled = scaler.transform(x)
+
         grade_idx = int(model.predict(x_scaled)[0])
         class_map = model_bundle["class_map"]
         grade = class_map[grade_idx]
+
         probs = model.predict_proba(x_scaled)[0]
-        probabilities = {class_map[int(c)]: float(probs[list(model.classes_).index(c)])
-                         for c in model.classes_}
+        probabilities = {
+            class_map[int(c)]: float(probs[list(model.classes_).index(c)])
+            for c in model.classes_
+        }
+
         result = build_report(
             grade=grade,
             confidence=float(max(probabilities.values())),
@@ -80,18 +128,42 @@ def predict():
             consumer_group=consumer_group,
             raw=raw,
         )
-        return render_template("index.html", model_ready=True, model_error=None,
-                               result=result, form=form)
-    except (ValueError, KeyError) as exc:
-        return render_template("index.html", model_ready=True, model_error=None,
-                               result=None, form=request.form,
-                               validation_error=str(exc)), 400
-    except Exception as exc:
-        app.logger.exception("Prediction failed")
-        return render_template("index.html", model_ready=True, model_error=None,
-                               result=None, form=request.form,
-                               validation_error=f"Prediction failed: {exc}"), 500
 
+        # Include the submitted values for the report template.
+        if isinstance(result, dict):
+            result.setdefault("input_features", raw)
+
+        return render_template(
+            "index.html",
+            model_ready=True,
+            model_error=None,
+            result=result,
+            form=form,
+        )
+
+    except (ValueError, KeyError) as exc:
+        return render_template(
+            "index.html",
+            model_ready=True,
+            model_error=None,
+            result=None,
+            form=form,
+            validation_error=str(exc),
+        ), 400
+
+    except Exception:
+        app.logger.exception("Prediction failed")
+        return render_template(
+            "index.html",
+            model_ready=True,
+            model_error=None,
+            result=None,
+            form=form,
+            validation_error=(
+                "Prediction failed. Check the VS Code terminal "
+                "for the detailed error."
+            ),
+        ), 500
 
 def engineer_features(raw, feature_names):
     ph = raw["pH"]

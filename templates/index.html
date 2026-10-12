@@ -1,96 +1,459 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Milk Quality AI | Prediction Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c6866">
+    <title>MilkQuality AI | Laboratory Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand-mark">M</div>
-    <div><div class="brand">MilkQuality AI</div><div class="subtitle">Rapid colorimetric quality assessment</div></div>
-    <span class="status-pill">{{ "Model ready" if model_ready else "Setup required" }}</span>
-  </header>
+<div class="app-shell">
 
-  <main class="layout">
-    <section class="intro">
-      <p class="eyebrow">AI-POWERED ANALYSIS</p>
-      <h1>Milk quality<br><span>prediction report</span></h1>
-      <p>Enter the milk properties and storage history to view the model's quality classification and the prototype's rule-based estimates.</p>
-      <div class="mini-stats">
-        <div><strong>3</strong><span>Quality classes</span></div>
-        <div><strong>7</strong><span>Input features</span></div>
-        <div><strong>1</strong><span>Prediction report</span></div>
-      </div>
-    </section>
+    <aside class="sidebar">
+        <a href="#dashboard" class="brand">
+            <span class="brand-icon">✚</span>
+            <span>
+                <strong>MilkQuality <b>AI</b></strong>
+                <small>LABORATORY SYSTEM</small>
+            </span>
+        </a>
 
-    <section class="panel form-panel">
-      <div class="panel-heading"><div><p class="eyebrow">INPUT DATA</p><h2>Milk sample details</h2></div><span class="step">01 / 02</span></div>
-      {% if not model_ready %}
-        <div class="notice warning"><strong>Model not ready</strong><p>{{ model_error }}</p></div>
-      {% endif %}
-      {% if validation_error %}<div class="notice error">{{ validation_error }}</div>{% endif %}
-      <form action="{{ url_for('predict') }}" method="post">
-        <div class="field-grid">
-          <label>pH level<input name="pH" type="number" min="0" max="14" step="0.01" value="{{ form.get('pH', '6.6') }}" required></label>
-          <label>Milk temperature (°C)<input name="Temprature" type="number" min="-5" max="100" step="0.1" value="{{ form.get('Temprature', '4') }}" required></label>
-          <label>Taste<select name="Taste"><option value="1" {% if form.get('Taste','1') == '1' %}selected{% endif %}>Normal</option><option value="0" {% if form.get('Taste') == '0' %}selected{% endif %}>Abnormal</option></select></label>
-          <label>Odor<select name="Odor"><option value="1" {% if form.get('Odor','1') == '1' %}selected{% endif %}>Normal</option><option value="0" {% if form.get('Odor') == '0' %}selected{% endif %}>Abnormal</option></select></label>
-          <label>Fat indicator<select name="Fat"><option value="1" {% if form.get('Fat','1') == '1' %}selected{% endif %}>Present / positive</option><option value="0" {% if form.get('Fat') == '0' %}selected{% endif %}>Absent / negative</option></select></label>
-          <label>Turbidity<select name="Turbidity"><option value="0" {% if form.get('Turbidity','0') == '0' %}selected{% endif %}>Low</option><option value="1" {% if form.get('Turbidity') == '1' %}selected{% endif %}>High</option></select></label>
-          <label>Colour (0–255)<input name="Colour" type="number" min="0" max="255" step="1" value="{{ form.get('Colour', '254') }}" required></label>
-          <label>Storage temperature (°C)<input name="storage_temp" type="number" min="-5" max="100" step="0.1" value="{{ form.get('storage_temp', '4') }}" required></label>
-          <label>Elapsed storage time (hours)<input name="elapsed_hrs" type="number" min="0" step="0.1" value="{{ form.get('elapsed_hrs', '2') }}" required></label>
-          <label>Milk type<select name="milk_type">{% for val, label in [('raw_milk','Raw milk'),('pasteurized','Pasteurized'),('UHT','UHT') ] %}<option value="{{ val }}" {% if form.get('milk_type','raw_milk') == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-          <label class="wide">Consumer group<select name="consumer_group">{% for val, label in [('adult','Adult'),('child','Child'),('infant','Infant'),('elderly','Elderly'),('immunocompromised','Immunocompromised') ] %}<option value="{{ val }}" {% if form.get('consumer_group','adult') == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <div class="nav-caption">WORKSPACE</div>
+        <nav class="navigation">
+            <a class="nav-link active" href="#dashboard"><span>▦</span> Dashboard</a>
+            <a class="nav-link" href="#sample-input"><span>⌕</span> Sample analysis</a>
+            <a class="nav-link" href="#results"><span>▤</span> Prediction report</a>
+        </nav>
+
+        <div class="sidebar-note">
+            <span class="sidebar-note-icon">ⓘ</span>
+            <strong>Research prototype</strong>
+            <p>AI-assisted milk quality classification using measured sample properties.</p>
         </div>
-        <button class="primary-btn" type="submit" {% if not model_ready %}disabled{% endif %}>Generate quality report <span>→</span></button>
-        <p class="form-footnote">Use measured input values. The result is a prototype output, not a certified safety test.</p>
-      </form>
-    </section>
 
-    {% if result %}
-    <section class="results">
-      <div class="results-heading"><div><p class="eyebrow">ANALYSIS COMPLETE</p><h2>Your milk quality report</h2><p class="muted">Generated {{ result.timestamp }}</p></div><span class="grade-badge grade-{{ result.grade|lower }}">{{ result.grade }} grade</span></div>
-      <div class="metrics">
-        <article class="metric-card"><span class="metric-label">Predicted grade</span><strong>{{ result.grade }}</strong><small>{{ result.confidence_pct }}% model confidence</small></article>
-        <article class="metric-card"><span class="metric-label">TPC proxy</span><strong>{{ result.tpc_cfu }}</strong><small>CFU/mL — grade-based estimate</small></article>
-        <article class="metric-card"><span class="metric-label">Hours remaining</span><strong>{{ result.hours_remaining }} h</strong><small>Rule-based shelf-life estimate</small></article>
-        <article class="metric-card"><span class="metric-label">Risk score</span><strong>{{ result.risk_score }}/100</strong><small>{{ result.risk_level }} · {{ result.consumer_group }}</small></article>
-      </div>
+        <div class="sidebar-footer">
+            <span class="status-dot"></span>
+            {% if model_ready %}Model loaded{% else %}Model unavailable{% endif %}
+            <small>Milk quality analysis</small>
+        </div>
+    </aside>
 
-      <div class="result-grid">
-        <article class="panel">
-          <div class="panel-heading"><h3>Grade probabilities</h3><span class="step">MODEL OUTPUT</span></div>
-          {% for name in ['Low','Medium','High'] %}
-          <div class="prob-row"><div><span>{{ name }}</span><strong>{{ result.probabilities.get(name, 0) }}%</strong></div><div class="bar-track"><div class="bar grade-bar-{{ name|lower }}" style="width: {{ result.probabilities.get(name, 0) }}%"></div></div></div>
-          {% endfor %}
-        </article>
-        <article class="panel">
-          <div class="panel-heading"><h3>Storage assessment</h3><span class="step">RULE-BASED</span></div>
-          <div class="detail-row"><span>Spoilage status</span><strong>{{ result.spoilage_status }}</strong></div>
-          <div class="detail-row"><span>Storage temperature</span><strong>{{ result.storage_temp }} °C</strong></div>
-          <div class="detail-row"><span>Elapsed time</span><strong>{{ result.elapsed_hrs }} hours</strong></div>
-          <p class="recommendation">{{ result.storage_recommendation }}</p>
-        </article>
-        <article class="panel">
-          <div class="panel-heading"><h3>Limit comparison</h3><span class="step">ESTIMATE ONLY</span></div>
-          <div class="detail-row"><span>Estimated TPC</span><strong>{{ result.tpc_cfu }} CFU/mL</strong></div>
-          <div class="detail-row"><span>Configured limit</span><strong>{{ result.fssai_limit }} CFU/mL</strong></div>
-          <div class="limit-status {{ 'pass' if result.fssai_pass else 'fail' }}">{{ "Below configured limit" if result.fssai_pass else "Above configured limit" }}</div>
-          <p class="small-note">This comparison is only as reliable as the configured limit and TPC estimate. It is not official FSSAI certification.</p>
-        </article>
-        <article class="panel">
-          <div class="panel-heading"><h3>Final recommendation</h3><span class="step">SUMMARY</span></div>
-          <div class="verdict">{{ result.verdict }}</div>
-          <p class="small-note">Model confidence describes its class prediction, not the probability that the milk is safe to consume.</p>
-        </article>
-      </div>
-      <div class="disclaimer"><strong>Important:</strong> TPC is currently a grade-based proxy and spoilage duration comes from fixed rules in the supplied prototype. Neither is a laboratory measurement or validated shelf-life model. Do not use this application alone to decide whether milk is safe, especially for infants or other vulnerable people.</div>
-    </section>
-    {% endif %}
-    <footer>MilkQuality AI · Academic prototype · Validate against laboratory measurements before real-world use</footer>
-  </main>
+    <main class="main-content" id="dashboard">
+        <header class="topbar">
+            <div>
+                <p class="breadcrumb">WORKSPACE <span>/</span> DASHBOARD</p>
+                <h1>Laboratory Dashboard</h1>
+            </div>
+            <div class="topbar-status">
+                <span class="status-dot"></span>
+                {% if model_ready %}System ready{% else %}System unavailable{% endif %}
+            </div>
+        </header>
+
+        <div class="page-content">
+            <section class="welcome">
+                <div>
+                    <p class="eyebrow">MILK QUALITY INTELLIGENCE</p>
+                    <h2>Welcome to your analysis workspace</h2>
+                    <p>Enter the measured milk properties to generate an AI-based quality classification.</p>
+                </div>
+                <div class="welcome-icon" aria-hidden="true">♧</div>
+            </section>
+
+            <section class="summary-grid" aria-label="System overview">
+                <article class="summary-card">
+                    <div class="summary-icon teal">⌁</div>
+                    <div><span>Input parameters</span><strong>07</strong><small>Measured properties</small></div>
+                </article>
+                <article class="summary-card">
+                    <div class="summary-icon blue">◉</div>
+                    <div><span>Quality classes</span><strong>03</strong><small>Low, Medium, High</small></div>
+                </article>
+                <article class="summary-card">
+                    <div class="summary-icon purple">✧</div>
+                    <div><span>Analysis engine</span><strong>AI</strong><small>Trained classification model</small></div>
+                </article>
+                <article class="summary-card">
+                    <div class="summary-icon green">✓</div>
+                    <div>
+                        <span>Model status</span>
+                        <strong class="status-value">{{ "Ready" if model_ready else "Offline" }}</strong>
+                        <small>Current loading status</small>
+                    </div>
+                </article>
+            </section>
+
+            {% if not model_ready %}
+            <div class="notice warning" role="alert">
+                <strong>⚠ Model not ready</strong>
+                <p>{{ model_error or "Check that milk_model.joblib exists and the model loads correctly." }}</p>
+            </div>
+            {% endif %}
+
+            {% if validation_error is defined and validation_error %}
+            <div class="notice error" role="alert">
+                <strong>Input validation error</strong>
+                <p>{{ validation_error }}</p>
+            </div>
+            {% endif %}
+
+            <div class="workspace-grid">
+                <section class="panel" id="sample-input">
+                    <div class="panel-heading">
+                        <div class="panel-heading-icon">⌕</div>
+                        <div>
+                            <h3>New sample analysis</h3>
+                            <p>Enter the measured values for your milk sample.</p>
+                        </div>
+                        <span class="section-tag">INPUT FORM</span>
+                    </div>
+
+                    <form action="{{ url_for('predict') }}" method="post" id="milkForm">
+
+                        <div class="form-section"><span>01</span> MILK PROPERTIES</div>
+
+                        <div class="field-grid">
+                            <label class="field">
+                                <span><i>◉</i> pH level</span>
+                                <input name="pH" type="number" min="0" max="14" step="0.01"
+                                    value="{{ form.get('pH', '6.6') }}" required>
+                                <small>Allowed range: 0–14</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>♨</i> Temperature (°C)</span>
+                                <input name="Temprature" type="number" min="-5" max="100" step="0.1"
+                                    value="{{ form.get('Temprature', '35') }}" required>
+                                <small>Sample temperature</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>◈</i> Taste</span>
+                                <select name="Taste" required>
+                                    <option value="1" {% if form.get('Taste', '1')|string == '1' %}selected{% endif %}>Normal (1)</option>
+                                    <option value="0" {% if form.get('Taste', '1')|string == '0' %}selected{% endif %}>Abnormal (0)</option>
+                                </select>
+                                <small>Use the dataset's numeric encoding</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>♧</i> Odor</span>
+                                <select name="Odor" required>
+                                    <option value="1" {% if form.get('Odor', '1')|string == '1' %}selected{% endif %}>Normal (1)</option>
+                                    <option value="0" {% if form.get('Odor', '1')|string == '0' %}selected{% endif %}>Abnormal (0)</option>
+                                </select>
+                                <small>Use the dataset's numeric encoding</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>◒</i> Fat content</span>
+                                <select name="Fat" required>
+                                    <option value="1" {% if form.get('Fat', '1')|string == '1' %}selected{% endif %}>Present (1)</option>
+                                    <option value="0" {% if form.get('Fat', '1')|string == '0' %}selected{% endif %}>Not present (0)</option>
+                                </select>
+                                <small>Use the dataset's numeric encoding</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>◌</i> Turbidity</span>
+                                <select name="Turbidity" required>
+                                    <option value="1" {% if form.get('Turbidity', '1')|string == '1' %}selected{% endif %}>High (1)</option>
+                                    <option value="0" {% if form.get('Turbidity', '1')|string == '0' %}selected{% endif %}>Low (0)</option>
+                                </select>
+                                <small>Use the dataset's numeric encoding</small>
+                            </label>
+
+                            <label class="field field-wide">
+                                <span><i>▧</i> Colour value</span>
+                                <div class="colour-input">
+                                    <input name="Colour" id="colourInput" type="number"
+                                        min="0" max="255" step="1"
+                                        value="{{ form.get('Colour', '240') }}" required>
+                                    <span class="colour-preview" id="colourPreview" aria-hidden="true"></span>
+                                </div>
+                                <small>Numeric colour value from 0 to 255</small>
+                            </label>
+                        </div>
+
+                        <div class="form-note">
+                            <span>ⓘ</span>
+                            Use the same numeric encoding and measurement method used by your training dataset.
+                        </div>
+
+                        <div class="form-section"><span>02</span> STORAGE AND SAMPLE CONTEXT</div>
+
+                        <div class="field-grid">
+                            <label class="field">
+                                <span><i>❄</i> Storage temperature (°C)</span>
+                                <input type="number" name="storage_temp" min="-5" max="100"
+                                    step="0.1" value="{{ form.get('storage_temp', '4') }}" required>
+                                <small>Temperature during storage</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>◷</i> Elapsed storage time (hours)</span>
+                                <input type="number" name="elapsed_hrs" min="0" step="0.1"
+                                    value="{{ form.get('elapsed_hrs', '0') }}" required>
+                                <small>Elapsed time in hours</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>◈</i> Milk type</span>
+                                <select name="milk_type" required>
+                                    <option value="raw_milk" {% if form.get('milk_type', 'raw_milk') == 'raw_milk' %}selected{% endif %}>Raw milk</option>
+                                    <option value="pasteurized" {% if form.get('milk_type') == 'pasteurized' %}selected{% endif %}>Pasteurized milk</option>
+                                    <option value="UHT" {% if form.get('milk_type') == 'UHT' %}selected{% endif %}>UHT milk</option>
+                                </select>
+                                <small>Used by the prototype's limit calculation</small>
+                            </label>
+
+                            <label class="field">
+                                <span><i>♙</i> Consumer group</span>
+                                <select name="consumer_group" required>
+                                    {% for value, label in [
+                                        ('adult', 'Adult'),
+                                        ('child', 'Child'),
+                                        ('infant', 'Infant'),
+                                        ('elderly', 'Elderly'),
+                                        ('immunocompromised', 'Immunocompromised')
+                                    ] %}
+                                    <option value="{{ value }}" {% if form.get('consumer_group', 'adult') == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small>For a demonstration risk score only</small>
+                            </label>
+                        </div>
+
+                        <button class="primary-button" id="analyzeButton" type="submit"
+                            {% if not model_ready %}disabled{% endif %}>
+                            <span class="button-symbol">✧</span>
+                            <span class="button-label">Analyze milk sample</span>
+                            <span class="button-arrow">→</span>
+                        </button>
+                        <p class="form-footnote">Review all values before running the prediction.</p>
+                    </form>
+                </section>
+
+                <aside class="side-column">
+                    <section class="panel guide-panel">
+                        <div class="panel-heading compact">
+                            <div class="panel-heading-icon">☷</div>
+                            <div><h3>Analysis workflow</h3><p>How the report is generated</p></div>
+                        </div>
+                        <div class="workflow-step">
+                            <span class="step-number">1</span>
+                            <div><strong>Enter sample data</strong><p>Provide all seven measured parameters and storage details.</p></div>
+                        </div>
+                        <div class="workflow-step">
+                            <span class="step-number">2</span>
+                            <div><strong>Run AI prediction</strong><p>The trained model processes the input values.</p></div>
+                        </div>
+                        <div class="workflow-step">
+                            <span class="step-number">3</span>
+                            <div><strong>Review the report</strong><p>Check the predicted grade and class probabilities.</p></div>
+                        </div>
+                    </section>
+
+                    <section class="panel class-guide">
+                        <div class="panel-heading compact">
+                            <div class="panel-heading-icon">◉</div>
+                            <div><h3>Quality classes</h3><p>Model output categories</p></div>
+                        </div>
+                        <div class="class-row">
+                            <span class="class-dot low"></span>
+                            <div><strong>Low quality</strong><small>Predicted class: Low</small></div>
+                            <span class="class-arrow">›</span>
+                        </div>
+                        <div class="class-row">
+                            <span class="class-dot medium"></span>
+                            <div><strong>Medium quality</strong><small>Predicted class: Medium</small></div>
+                            <span class="class-arrow">›</span>
+                        </div>
+                        <div class="class-row">
+                            <span class="class-dot high"></span>
+                            <div><strong>High quality</strong><small>Predicted class: High</small></div>
+                            <span class="class-arrow">›</span>
+                        </div>
+                    </section>
+
+                    <div class="safety-note">
+                        <span>ⓘ</span>
+                        <p><strong>Important</strong><br>
+                        This AI prediction is not a microbiological test or a guarantee that milk is safe to consume.</p>
+                    </div>
+                </aside>
+            </div>
+
+            {% if result %}
+            {% set grade = result.get('grade', 'Unknown') %}
+            {% set confidence = result.get('confidence_pct', 0) %}
+            {% set probabilities = result.get('probabilities', {}) %}
+            {% set grade_class = 'high' if grade|string|lower == 'high' else ('medium' if grade|string|lower == 'medium' else 'low') %}
+
+            <section class="results-section" id="results">
+                <div class="results-heading">
+                    <div>
+                        <p class="eyebrow">COMPLETED ANALYSIS</p>
+                        <h2>Prediction report</h2>
+                        <p>Review the model output for the submitted sample.</p>
+                    </div>
+                    <button type="button" class="secondary-button" id="printReport">⎙ Print report</button>
+                </div>
+
+                <div class="prediction-hero {{ grade_class }}">
+                    <div class="prediction-main">
+                        <span class="prediction-kicker">AI-PREDICTED QUALITY GRADE</span>
+                        <div class="prediction-grade-line">
+                            <span class="grade-symbol" aria-hidden="true">
+                                {% if grade_class == 'high' %}✓{% elif grade_class == 'medium' %}◷{% else %}⚠{% endif %}
+                            </span>
+                            <h3>{{ grade }}</h3>
+                        </div>
+                        <p class="prediction-description">
+                            {% if grade_class == 'high' %}
+                                The model assigned this sample to the High quality class.
+                            {% elif grade_class == 'medium' %}
+                                The model assigned this sample to the Medium quality class.
+                            {% else %}
+                                The model assigned this sample to the Low quality class or could not identify a known grade.
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="confidence-circle">
+                        <strong>{{ "%.1f"|format(confidence|float) }}%</strong>
+                        <span>Model confidence</span>
+                    </div>
+                </div>
+
+                <div class="report-grid">
+                    <article class="report-card">
+                        <div class="report-card-heading"><span class="metric-icon teal">◉</span><span>Predicted grade</span></div>
+                        <strong>{{ grade }}</strong>
+                        <small>Classification output</small>
+                    </article>
+                    <article class="report-card">
+                        <div class="report-card-heading"><span class="metric-icon blue">▥</span><span>TPC proxy estimate</span></div>
+                        <strong>{{ result.get('tpc_cfu', 'Not available') }}</strong>
+                        <small>Unvalidated prototype estimate</small>
+                    </article>
+                    <article class="report-card">
+                        <div class="report-card-heading"><span class="metric-icon amber">◷</span><span>Time estimate</span></div>
+                        <strong>{{ result.get('hours_remaining', 'Not available') }}{% if result.get('hours_remaining') is not none %} h{% endif %}</strong>
+                        <small>Not a validated shelf-life measurement</small>
+                    </article>
+                    <article class="report-card">
+                        <div class="report-card-heading"><span class="metric-icon purple">⚑</span><span>Prototype risk level</span></div>
+                        <strong>{{ result.get('risk_level', 'Not calculated') }}</strong>
+                        <small>Rule-based demonstration score</small>
+                    </article>
+                </div>
+
+                <div class="report-columns">
+                    <section class="panel">
+                        <div class="panel-heading">
+                            <div class="panel-heading-icon">▤</div>
+                            <div><h3>Class probability</h3><p>Model probability for each class</p></div>
+                        </div>
+
+                        {% for class_name in ['Low', 'Medium', 'High'] %}
+                        {% set pct = probabilities.get(class_name, 0)|float %}
+                        <div class="probability-row">
+                            <div class="probability-label">
+                                <span><i class="class-dot {{ class_name|lower }}"></i>{{ class_name }} quality</span>
+                                <strong>{{ "%.1f"|format(pct) }}%</strong>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-bar {{ class_name|lower }}"
+                                    data-width="{{ pct }}"
+                                    style="width: {{ [0, [pct, 100]|min]|max }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <p class="small-note">Probabilities are model outputs, not direct measurements of microbial content.</p>
+                    </section>
+
+                    <section class="panel">
+                        <div class="panel-heading">
+                            <div class="panel-heading-icon">☷</div>
+                            <div><h3>Sample details</h3><p>Values submitted for analysis</p></div>
+                        </div>
+                        {% set features = result.get('input_features', {}) %}
+                        {% for key, label in [
+                            ('pH', 'pH level'),
+                            ('Temprature', 'Sample temperature'),
+                            ('Taste', 'Taste'),
+                            ('Odor', 'Odor'),
+                            ('Fat', 'Fat'),
+                            ('Turbidity', 'Turbidity'),
+                            ('Colour', 'Colour')
+                        ] %}
+                        <div class="detail-row">
+                            <span>{{ label }}</span>
+                            <strong>{{ features.get(key, form.get(key, '—')) }}</strong>
+                        </div>
+                        {% endfor %}
+                        <div class="detail-row"><span>Storage temperature</span><strong>{{ result.get('storage_temp', '—') }} °C</strong></div>
+                        <div class="detail-row"><span>Elapsed storage time</span><strong>{{ result.get('elapsed_hrs', '—') }} hours</strong></div>
+                        <div class="detail-row"><span>Milk type</span><strong>{{ form.get('milk_type', '—') }}</strong></div>
+                        <div class="detail-row"><span>Report timestamp</span><strong>{{ result.get('timestamp', 'Not supplied') }}</strong></div>
+                    </section>
+                </div>
+
+                <section class="panel recommendation-panel">
+                    <div class="panel-heading">
+                        <div class="panel-heading-icon">✧</div>
+                        <div><h3>Interpretation and next steps</h3><p>Use the output as a screening aid only</p></div>
+                    </div>
+
+                    <p class="recommendation-text">
+                        {% if grade_class == 'low' %}
+                            <strong>⚠ Low-quality classification:</strong>
+                            Review the sample measurements and confirm the result using appropriate laboratory tests.
+                        {% elif grade_class == 'medium' %}
+                            <strong>◷ Medium-quality classification:</strong>
+                            Consider further inspection and confirm the result with an established laboratory method.
+                        {% else %}
+                            <strong>✓ High-quality classification:</strong>
+                            The model assigned a High grade. This does not establish microbiological safety; use appropriate testing and handling procedures.
+                        {% endif %}
+                    </p>
+
+                    <div class="detail-row">
+                        <span>Prototype storage status</span>
+                        <strong>{{ result.get('spoilage_status', 'Not calculated') }}</strong>
+                    </div>
+
+                    {% if result.get('storage_recommendation') %}
+                    <div class="detail-row">
+                        <span>Storage recommendation</span>
+                        <strong>{{ result.get('storage_recommendation') }}</strong>
+                    </div>
+                    {% endif %}
+
+                    {% if result.get('verdict') %}
+                    <div class="verdict-line">
+                        <strong>Prototype message:</strong> {{ result.get('verdict') }}
+                    </div>
+                    {% endif %}
+                </section>
+
+                <div class="disclaimer">
+                    <span>ⓘ</span>
+                    <p><strong>Scientific limitation</strong><br>
+                    This dashboard displays an ML classification. TPC, risk, regulatory compliance, and shelf-life values are prototype estimates and have not been independently validated. A predicted grade alone cannot establish that milk is safe to consume.</p>
+                </div>
+            </section>
+            {% endif %}
+
+            <footer class="page-footer">
+                MilkQuality AI · Laboratory research prototype
+                <span>For research and screening support only</span>
+            </footer>
+        </div>
+    </main>
+</div>
 </body>
 </html>
